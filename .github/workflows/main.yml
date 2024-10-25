@@ -1,0 +1,31 @@
+on:
+ push:
+   branches:
+     - main
+     - develop
+
+jobs:
+  build:
+    name: mac-build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest]
+    steps:
+    - name: Declare some variables
+      shell: bash
+      run: |
+        echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+        echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
+    - name: build
+      run: |
+        brew install qt@6
+        mkdir build
+        cd build
+        qmake ./...
+        make
+    - name: upload
+      uses: actions/upload-artifact@v4
+      with:
+       name: Droidstar-${{ env.sha_short }}-${{ matrix.os }}
+       path: build/Droidstar.app
