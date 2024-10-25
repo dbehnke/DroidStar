@@ -19,18 +19,14 @@ jobs:
       run: |
         echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
         echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
-    - name: install QT6
+    - name: install dependencies
       run: |
-        brew install qt@6
-        brew unlink qt && brew link qt
+        brew install qt@6 cmake
     - name: build
       run: |
-        ls -lh
-        which qmake
-        ls -lh /opt/homebrew/bin/qmake
         mkdir build
         cd build
-        /opt/homebrew/bin/qmake ./...
+        cmake ..
         make
     - name: upload
       uses: actions/upload-artifact@v4
