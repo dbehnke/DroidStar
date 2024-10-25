@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest]
+        os: [macos-13,macos-14]
     steps:
     - name: checkout
       uses: actions/checkout@v4
@@ -19,6 +19,8 @@ jobs:
       run: |
         echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
         echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
+        echo "platform=$(uname -o)" >> "$GITHUB_ENV" 
+        echo "arch=$(uname -m)" >> "$GITHUB_ENV"
     - name: install dependencies
       run: |
         brew install qt@6 cmake
@@ -31,5 +33,5 @@ jobs:
     - name: upload
       uses: actions/upload-artifact@v4
       with:
-       name: Droidstar-${{ env.sha_short }}-${{ matrix.os }}
+       name: Droidstar-${{ env.sha_short }}-${{ env.platform }}-${{ env.arch }}-$
        path: build/Droidstar.app
