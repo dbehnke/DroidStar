@@ -17,9 +17,11 @@ jobs:
       run: |
         echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
         echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
-    - name: build
+    - name: install QT6
       run: |
         brew install qt@6
+    - name: build
+        ls -lh
         mkdir build
         cd build
         qmake ./...
