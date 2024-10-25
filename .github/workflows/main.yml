@@ -23,7 +23,7 @@ jobs:
         echo "arch=$(uname -m)" >> "$GITHUB_ENV"
     - name: install dependencies
       run: |
-        brew install qt@6 cmake
+        brew install qt@6
     - name: build
       run: |
         mkdir build
