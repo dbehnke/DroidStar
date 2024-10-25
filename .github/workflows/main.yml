@@ -21,6 +21,7 @@ jobs:
       run: |
         brew install qt@6
     - name: build
+      run: |
         ls -lh
         mkdir build
         cd build
