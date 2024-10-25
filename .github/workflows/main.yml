@@ -26,6 +26,8 @@ jobs:
     - name: build
       run: |
         ls -lh
+        which qmake
+        ls -lh /opt/homebrew/bin/qmake
         mkdir build
         cd build
         /opt/homebrew/bin/qmake ./...
