@@ -33,5 +33,5 @@ jobs:
     - name: upload
       uses: actions/upload-artifact@v4
       with:
-       name: Droidstar-${{ env.sha_short }}-${{ env.platform }}-${{ env.arch }}-$
+       name: Droidstar-${{ env.sha_short }}-${{ env.platform }}-${{ env.arch }}
        path: build/Droidstar.app
