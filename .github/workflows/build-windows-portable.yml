@@ -51,10 +51,28 @@ jobs:
         ref: ${{ inputs.branch }}
         fetch-depth: 0
     
+    - name: Verify vcpkg.json exists
+      shell: bash
+      run: |
+        echo "=== Verifying vcpkg.json file ==="
+        echo "Current working directory: $(pwd)"
+        echo "Repository contents:"
+        ls -la
+        if [ -f "vcpkg.json" ]; then
+          echo "✅ vcpkg.json found"
+          echo "File contents:"
+          cat vcpkg.json
+        else
+          echo "❌ vcpkg.json not found"
+          echo "Looking for vcpkg.json in subdirectories:"
+          find . -name "vcpkg.json" -type f || echo "No vcpkg.json files found"
+        fi
+    
     - name: Setup vcpkg with vcpkg.json
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgJsonGlob: '**/vcpkg.json'
+        vcpkgJsonGlob: './vcpkg.json'
+        vcpkgGitCommitId: '01f602195983560bc1c7969fe20b7a03c1b1e78f'
     
     - name: Export GitHub Actions cache environment variables
       uses: actions/github-script@v7
