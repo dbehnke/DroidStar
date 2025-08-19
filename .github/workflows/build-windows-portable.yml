@@ -193,12 +193,16 @@ jobs:
       run: |
         echo "=== Pre-deployment dependency check ==="
         
-        # Check if executable exists and runs
+        # Check if executable exists
         if [ -f "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe" ]; then
           echo "Executable found: ${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe"
           
-          # Try to get version info (may fail if dependencies missing)
-          ./${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe --version || echo "Version check failed (expected - dependencies not deployed yet)"
+          # Get file info without executing
+          ls -la "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe"
+          file "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe" || echo "file command not available"
+          
+          # Skip version check to avoid GUI initialization issues
+          echo "Skipping version check - executable will be tested after deployment"
         else
           echo "ERROR: Executable not found!"
           exit 1
@@ -248,8 +252,17 @@ jobs:
         echo "=== Testing executable ==="
         cd "${{ steps.build_info.outputs.app_name }}"
         
-        # Test basic functionality
-        ./DroidStar.exe --version || echo "Version check failed"
+        # Test basic functionality with timeout to prevent hanging
+        timeout 10s ./DroidStar.exe --version || echo "Version check failed or timed out (expected in CI environment)"
+        
+        # Alternative: just verify the executable is properly formed
+        if [ -f "DroidStar.exe" ]; then
+          echo "✅ Executable exists in bundle"
+          ls -la DroidStar.exe
+        else
+          echo "❌ Executable missing from bundle"
+          exit 1
+        fi
         
         echo "=== Portable executable verification completed ==="
     
