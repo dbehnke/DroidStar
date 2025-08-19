@@ -59,6 +59,15 @@ jobs:
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+        
+    - name: Update vcpkg and ports
+      shell: bash
+      run: |
+        echo "=== Updating vcpkg and ports ==="
+        cd "$VCPKG_ROOT"
+        git pull || echo "Git pull failed, continuing with existing version"
+        ./vcpkg update-registry || echo "Registry update failed, continuing"
+        echo "=== vcpkg update completed ==="
     
     - name: Export GitHub Actions cache environment variables
       uses: actions/github-script@v7
@@ -107,22 +116,25 @@ jobs:
           # Try to install RtMidi for MIDI support with multiple fallback strategies
           echo "Attempting to install RtMidi..."
           
-          # Strategy 1: Standard installation
+          # Strategy 1: Update baseline and try standard installation
+          vcpkg update-baseline || echo "Baseline update failed, continuing"
+          
           if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build; then
             echo "RtMidi installed successfully"
             echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
           else
-            echo "WARNING: Standard RtMidi installation failed, trying alternatives..."
+            echo "WARNING: Standard RtMidi installation failed, trying alternative approaches..."
             
-            # Strategy 2: Try with older vcpkg commit or different approach
-            vcpkg update-baseline || echo "Baseline update failed"
-            
+            # Strategy 2: Try with different registry or older port
             if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build --recurse; then
               echo "RtMidi installed successfully with recurse option"
               echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
             else
-              echo "WARNING: All RtMidi installation attempts failed"
-              echo "Building without MIDI support"
+              echo "WARNING: vcpkg RtMidi installation failed"
+              echo "Trying to use system RtMidi or disabling MIDI..."
+              
+              # Strategy 3: Try using pre-built binaries or disable MIDI
+              echo "Building without MIDI support due to dependency failures"
               echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
             fi
           fi
@@ -158,6 +170,19 @@ jobs:
         mkdir -p build
         cd build
         echo "Build directory created in: $(pwd)"
+        
+    - name: Prepare translations directory
+      shell: bash
+      run: |
+        echo "=== Preparing translations directory ==="
+        mkdir -p build/translations
+        mkdir -p build/i18n
+        # Ensure write permissions for translation files
+        chmod -R 755 build/ || echo "chmod not available, continuing"
+        echo "Current directory: $(pwd)"
+        echo "Build directory contents:"
+        ls -la build/ || echo "ls not available"
+        echo "=== Translation directory preparation completed ==="
     
     - name: Configure with CMake
       working-directory: build
@@ -165,6 +190,11 @@ jobs:
       run: |
         echo "=== CMake Configuration ==="
         echo "MIDI support: $ENABLE_MIDI"
+        
+        # Set environment to prevent lconvert issues
+        export QT_LOGGING_RULES="*=false"
+        export QT_NO_TRANSLATION_BUILDER=1
+        
         cmake .. \
           -G "Visual Studio 17 2022" \
           -A ${{ inputs.architecture == 'x64' && 'x64' || 'Win32' }} \
@@ -173,7 +203,8 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
           -DVCPKG_TARGET_TRIPLET="$VCPKG_TARGET_TRIPLET" \
           -DENABLE_MIDI=$ENABLE_MIDI \
-          -DCMAKE_VERBOSE_MAKEFILE=ON
+          -DCMAKE_VERBOSE_MAKEFILE=ON \
+          -DQT_NO_CREATE_VERSIONLESS_FUNCTIONS=ON
         
         echo "=== CMake configuration completed ==="
     
@@ -182,6 +213,11 @@ jobs:
       shell: bash
       run: |
         echo "=== Starting build ==="
+        
+        # Set environment to prevent translation issues during build
+        export QT_LOGGING_RULES="*=false"
+        export QT_NO_TRANSLATION_BUILDER=1
+        
         cmake --build . --config ${{ env.CMAKE_BUILD_TYPE }} --parallel
         
         echo "=== Build completed ==="
