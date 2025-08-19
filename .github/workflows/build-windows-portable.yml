@@ -72,7 +72,7 @@ jobs:
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgJsonGlob: './vcpkg.json'
-        vcpkgGitCommitId: '01f602195983560bc1c7969fe20b7a03c1b1e78f'
+        vcpkgGitCommitId: 'ee0973d8090e4e3e452244bb50d34c25fe907dc2'
     
     - name: Export GitHub Actions cache environment variables
       uses: actions/github-script@v7
