@@ -189,18 +189,27 @@ jobs:
         cd build
         echo "Build directory created in: $(pwd)"
         
-    - name: Prepare translations directory
+    - name: Prepare build environment and disable translations
       shell: bash
       run: |
-        echo "=== Preparing translations directory ==="
-        mkdir -p build/translations
-        mkdir -p build/i18n
-        # Ensure write permissions for translation files
-        chmod -R 755 build/ || echo "chmod not available, continuing"
+        echo "=== Preparing build environment ==="
+        
+        # Clean any existing translation directories that might cause issues
+        rm -rf build/translations || echo "No translations directory to remove"
+        rm -rf build/**/translations || echo "No nested translation directories to remove"
+        
+        # Create minimal required directories
+        mkdir -p build
+        
+        # Set global environment to disable Qt translations
+        echo "QT_NO_TRANSLATION_BUILDER=1" >> $GITHUB_ENV
+        echo "QT_NO_TRANSLATION=1" >> $GITHUB_ENV
+        echo "QT_LOGGING_RULES=*=false" >> $GITHUB_ENV
+        
         echo "Current directory: $(pwd)"
         echo "Build directory contents:"
         ls -la build/ || echo "ls not available"
-        echo "=== Translation directory preparation completed ==="
+        echo "=== Build environment preparation completed ==="
     
     - name: Configure with CMake
       working-directory: build
@@ -212,6 +221,8 @@ jobs:
         # Set environment to prevent lconvert issues
         export QT_LOGGING_RULES="*=false"
         export QT_NO_TRANSLATION_BUILDER=1
+        export QT_NO_TRANSLATION=1
+        export QT_DISABLE_DEPRECATED_BEFORE=0x060000
         
         cmake .. \
           -G "Visual Studio 17 2022" \
@@ -223,7 +234,10 @@ jobs:
           -DVCPKG_TARGET_TRIPLET="$VCPKG_TARGET_TRIPLET" \
           -DENABLE_MIDI=$ENABLE_MIDI \
           -DCMAKE_VERBOSE_MAKEFILE=ON \
-          -DQT_NO_CREATE_VERSIONLESS_FUNCTIONS=ON
+          -DQT_NO_CREATE_VERSIONLESS_FUNCTIONS=ON \
+          -DQT_BUILD_TRANSLATIONS=OFF \
+          -DQT_BUILD_EXAMPLES=OFF \
+          -DQT_BUILD_TESTS=OFF
         
         echo "=== CMake configuration completed ==="
     
@@ -236,6 +250,8 @@ jobs:
         # Set environment to prevent translation issues during build
         export QT_LOGGING_RULES="*=false"
         export QT_NO_TRANSLATION_BUILDER=1
+        export QT_NO_TRANSLATION=1
+        export QT_DISABLE_DEPRECATED_BEFORE=0x060000
         
         cmake --build . --config ${{ env.CMAKE_BUILD_TYPE }} --parallel
         
