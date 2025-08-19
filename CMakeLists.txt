@@ -132,7 +132,44 @@ if(ENABLE_MIDI)
         target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi)
         set(MIDI_FOUND TRUE)
     else()
-        # Try to find RtMidi using pkg-config (preferred method for non-vcpkg)
+        # Check if we have vcpkg installed RtMidi manually
+        if(DEFINED ENV{VCPKG_ROOT} AND DEFINED ENV{VCPKG_TARGET_TRIPLET})
+            set(VCPKG_INCLUDE_DIR "$ENV{VCPKG_ROOT}/installed/$ENV{VCPKG_TARGET_TRIPLET}/include")
+            set(VCPKG_LIB_DIR "$ENV{VCPKG_ROOT}/installed/$ENV{VCPKG_TARGET_TRIPLET}/lib")
+            
+            if(EXISTS "${VCPKG_INCLUDE_DIR}/RtMidi.h")
+                message(STATUS "Found RtMidi in vcpkg installation: ${VCPKG_INCLUDE_DIR}")
+                target_compile_definitions(DroidStar PRIVATE ENABLE_MIDI)
+                target_include_directories(DroidStar PRIVATE ${VCPKG_INCLUDE_DIR})
+                
+                # Try to find the library
+                find_library(VCPKG_RTMIDI_LIB 
+                    NAMES rtmidi librtmidi
+                    PATHS ${VCPKG_LIB_DIR}
+                    NO_DEFAULT_PATH
+                )
+                
+                if(VCPKG_RTMIDI_LIB)
+                    target_link_libraries(DroidStar PRIVATE ${VCPKG_RTMIDI_LIB})
+                    message(STATUS "Linked vcpkg RtMidi library: ${VCPKG_RTMIDI_LIB}")
+                else()
+                    message(STATUS "RtMidi header found but library not found, linking winmm directly")
+                    target_link_libraries(DroidStar PRIVATE winmm)
+                endif()
+                
+                # Add Windows-specific MIDI support
+                if(WIN32)
+                    target_link_libraries(DroidStar PRIVATE winmm)
+                    target_compile_definitions(DroidStar PRIVATE __WINDOWS_MM__)
+                endif()
+                
+                set(MIDI_FOUND TRUE)
+            endif()
+        endif()
+    endif()
+    
+    # If vcpkg didn't work, try pkg-config (preferred method for non-vcpkg)
+    if(NOT MIDI_FOUND)
         find_package(PkgConfig QUIET)
         if(PkgConfig_FOUND)
             pkg_check_modules(RTMIDI rtmidi)
