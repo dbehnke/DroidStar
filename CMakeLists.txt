@@ -20,7 +20,7 @@ set(MACOSX_BUNDLE_ICON_FILE droidstar.icns)
 set(app_icon_macos "${CMAKE_CURRENT_SOURCE_DIR}/images/droidstar.icns")
 set_source_files_properties(${app_icon_macos} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
-qt_add_executable(DroidStar WIN32 MACOSX_BUNDLE
+add_executable(DroidStar WIN32 MACOSX_BUNDLE
     CRCenc.cpp CRCenc.h
     DMRDefines.h
     Golay24128.cpp Golay24128.h
@@ -85,16 +85,31 @@ qt_add_executable(DroidStar WIN32 MACOSX_BUNDLE
     ${app_icon_macos}
 )
 
-qt_add_qml_module(DroidStar
-    URI DroidStarApp
-    VERSION 1.0
-    QML_FILES Main.qml
-    QML_FILES MainTab.qml
-    QML_FILES SettingsTab.qml
-    QML_FILES LogTab.qml
-    QML_FILES HostsTab.qml
-    QML_FILES AboutTab.qml
+# QML files handling for older Qt6 versions
+set(QML_FILES
+    Main.qml
+    MainTab.qml
+    SettingsTab.qml
+    LogTab.qml
+    HostsTab.qml
+    AboutTab.qml
 )
+
+# Add QML files to the target
+target_sources(DroidStar PRIVATE ${QML_FILES})
+
+# Set QML files as resources (if qt6_add_resources is available)
+if(COMMAND qt6_add_resources)
+    qt6_add_resources(DroidStar "qml"
+        PREFIX "/"
+        FILES ${QML_FILES}
+    )
+else()
+    # Fallback: copy QML files to build directory
+    foreach(qml_file ${QML_FILES})
+        configure_file(${qml_file} ${CMAKE_CURRENT_BINARY_DIR}/${qml_file} COPYONLY)
+    endforeach()
+endif()
 
 execute_process(
     COMMAND git rev-parse --short HEAD
@@ -376,9 +391,14 @@ install(TARGETS DroidStar
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-qt_generate_deploy_app_script(
-    TARGET DroidStar
-    FILENAME_VARIABLE deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-)
-install(SCRIPT ${deploy_script})
+# Deployment script generation (if available in Qt version)
+if(COMMAND qt_generate_deploy_app_script)
+    qt_generate_deploy_app_script(
+        TARGET DroidStar
+        FILENAME_VARIABLE deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+    install(SCRIPT ${deploy_script})
+else()
+    message(STATUS "qt_generate_deploy_app_script not available, skipping deployment script generation")
+endif()
