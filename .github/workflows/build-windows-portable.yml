@@ -161,30 +161,32 @@ jobs:
           echo "=== Installing dependencies from vcpkg.json ==="
           
           # Use vcpkg install to process vcpkg.json dependencies
-          # First copy vcpkg.json to current directory if vcpkg looks for it there
+          # Verify vcpkg.json exists in repository root
           if [ ! -f "vcpkg.json" ]; then
-            echo "vcpkg.json not found in current directory, this might cause issues"
-          fi
-          
-          cd "$VCPKG_ROOT"
-          if ./vcpkg install --triplet $VCPKG_TARGET_TRIPLET --x-manifest-root="${GITHUB_WORKSPACE}"; then
-            echo "✅ Dependencies installed successfully from vcpkg.json"
-            echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
+            echo "❌ vcpkg.json not found in repository root"
+            echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
           else
-            echo "❌ vcpkg.json dependency installation failed"
-            echo "Trying manual RtMidi installation as fallback..."
+            echo "✅ vcpkg.json found in repository root"
             
-            if ./vcpkg install rtmidi:$VCPKG_TARGET_TRIPLET; then
-              echo "✅ RtMidi installed successfully via manual installation"
+            # Run vcpkg install from repository root (where vcpkg.json is)
+            if "$VCPKG_ROOT/vcpkg" install --triplet $VCPKG_TARGET_TRIPLET; then
+              echo "✅ Dependencies installed successfully from vcpkg.json"
               echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
             else
-              echo "❌ All RtMidi installation attempts failed"
-              echo "📝 Building without MIDI support due to vcpkg/MSYS2 dependency issues"
-              echo "This is often due to outdated MSYS2 mirror URLs in vcpkg portfiles"
-              echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
+              echo "❌ vcpkg.json dependency installation failed"
+              echo "Trying manual RtMidi installation as fallback..."
+              
+              if "$VCPKG_ROOT/vcpkg" install rtmidi:$VCPKG_TARGET_TRIPLET; then
+                echo "✅ RtMidi installed successfully via manual installation"
+                echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
+              else
+                echo "❌ All RtMidi installation attempts failed"
+                echo "📝 Building without MIDI support due to vcpkg/MSYS2 dependency issues"
+                echo "This is often due to outdated MSYS2 mirror URLs in vcpkg portfiles"
+                echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
+              fi
             fi
           fi
-          cd -
         else
           echo "MIDI support disabled by user input"
           echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
@@ -192,15 +194,14 @@ jobs:
         
         # Verify installations
         echo "=== Installed packages ==="
-        cd "$VCPKG_ROOT"
-        ./vcpkg list
+        "$VCPKG_ROOT/vcpkg" list
         
         # Debug RtMidi installation
         echo "=== RtMidi installation verification ==="
-        if ./vcpkg list | grep -i rtmidi; then
+        if "$VCPKG_ROOT/vcpkg" list | grep -i rtmidi; then
           echo "✅ RtMidi found in vcpkg packages"
           echo "RtMidi installation details:"
-          ./vcpkg list rtmidi || echo "Could not get RtMidi details"
+          "$VCPKG_ROOT/vcpkg" list rtmidi || echo "Could not get RtMidi details"
           
           # Check if headers are accessible
           if [ -d "$VCPKG_ROOT/installed/$VCPKG_TARGET_TRIPLET/include" ]; then
@@ -210,9 +211,8 @@ jobs:
         else
           echo "❌ RtMidi not found in vcpkg packages"
           echo "Available packages:"
-          ./vcpkg list | head -10
+          "$VCPKG_ROOT/vcpkg" list | head -10
         fi
-        cd -
     
     - name: Configure build environment
       shell: bash
