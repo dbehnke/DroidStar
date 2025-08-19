@@ -4,12 +4,16 @@ project(DroidStar VERSION 1.0 LANGUAGES C CXX)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 if(IOS)
-    find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Multimedia Network Quick QuickControls2)
+    find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Multimedia Network Quick QuickControls2)
 else()
-    find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Multimedia Network Quick QuickControls2 SerialPort)
+    find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Multimedia Network Quick QuickControls2 SerialPort)
 endif()
 
-qt_standard_project_setup(REQUIRES 6.5)
+# qt_standard_project_setup(REQUIRES 6.5)  # Not available in all Qt6 versions
+# Manual setup for compatibility
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
 set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/droidstar.rc")
 set(MACOSX_BUNDLE_ICON_FILE droidstar.icns)

@@ -95,6 +95,24 @@ jobs:
         arch: 'win64_msvc2019_64'
         modules: 'qtmultimedia qtserialport'
         cache: true
+        setup-python: false
+        
+    - name: Verify Qt installation
+      shell: bash
+      run: |
+        echo "=== Qt Installation Verification ==="
+        echo "Qt6_DIR: ${{ env.Qt6_DIR }}"
+        echo "PATH includes Qt: $(echo $PATH | grep -o '[^:]*Qt[^:]*' || echo 'Not found in PATH')"
+        
+        # Check if Qt CMake files are available
+        if [ -d "${{ env.Qt6_DIR }}/lib/cmake/Qt6" ]; then
+          echo "✅ Qt6 CMake files found"
+          ls "${{ env.Qt6_DIR }}/lib/cmake/Qt6" | head -5
+        else
+          echo "❌ Qt6 CMake files not found"
+          echo "Available directories in Qt6_DIR:"
+          ls "${{ env.Qt6_DIR }}" || echo "Qt6_DIR not accessible"
+        fi
     
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -200,6 +218,7 @@ jobs:
           -A ${{ inputs.architecture == 'x64' && 'x64' || 'Win32' }} \
           -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
           -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}" \
+          -DQt6_DIR="${{ env.Qt6_DIR }}/lib/cmake/Qt6" \
           -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
           -DVCPKG_TARGET_TRIPLET="$VCPKG_TARGET_TRIPLET" \
           -DENABLE_MIDI=$ENABLE_MIDI \
