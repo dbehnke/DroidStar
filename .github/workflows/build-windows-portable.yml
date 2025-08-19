@@ -50,23 +50,18 @@ jobs:
       with:
         ref: ${{ inputs.branch }}
         fetch-depth: 0
-        submodules: recursive
-    
-    - name: Initialize submodules
-      run: git submodule update --init --recursive
     
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
         
-    - name: Update vcpkg and ports
+    - name: Update vcpkg
       shell: bash
       run: |
-        echo "=== Updating vcpkg and ports ==="
+        echo "=== Updating vcpkg ==="
         cd "$VCPKG_ROOT"
         git pull || echo "Git pull failed, continuing with existing version"
-        ./vcpkg update-registry || echo "Registry update failed, continuing"
         echo "=== vcpkg update completed ==="
     
     - name: Export GitHub Actions cache environment variables
@@ -134,8 +129,7 @@ jobs:
           # Try to install RtMidi for MIDI support with multiple fallback strategies
           echo "Attempting to install RtMidi..."
           
-          # Strategy 1: Update baseline and try standard installation
-          vcpkg update-baseline || echo "Baseline update failed, continuing"
+          # Strategy 1: Standard installation
           
           if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build; then
             echo "RtMidi installed successfully"
@@ -194,21 +188,31 @@ jobs:
       run: |
         echo "=== Preparing build environment ==="
         
-        # Clean any existing translation directories that might cause issues
-        rm -rf build/translations || echo "No translations directory to remove"
-        rm -rf build/**/translations || echo "No nested translation directories to remove"
-        
-        # Create minimal required directories
+        # Create build directory
         mkdir -p build
         
-        # Set global environment to disable Qt translations
+        # Disable Qt translations completely
         echo "QT_NO_TRANSLATION_BUILDER=1" >> $GITHUB_ENV
         echo "QT_NO_TRANSLATION=1" >> $GITHUB_ENV
         echo "QT_LOGGING_RULES=*=false" >> $GITHUB_ENV
+        echo "QT_SELECT=qt6" >> $GITHUB_ENV
+        
+        # Prevent lconvert from being found/used by temporarily renaming it
+        QT_LCONVERT_PATH="${{ env.Qt6_DIR }}/bin/lconvert.exe"
+        if [ -f "$QT_LCONVERT_PATH" ]; then
+          echo "Temporarily disabling lconvert to prevent translation issues"
+          mv "$QT_LCONVERT_PATH" "${QT_LCONVERT_PATH}.disabled" || echo "Could not disable lconvert"
+        fi
+        
+        # Also check for Qt translation directories and temporarily rename them
+        QT_TRANSLATIONS_DIR="${{ env.Qt6_DIR }}/translations"
+        if [ -d "$QT_TRANSLATIONS_DIR" ]; then
+          echo "Temporarily hiding Qt translations directory"
+          mv "$QT_TRANSLATIONS_DIR" "${QT_TRANSLATIONS_DIR}.disabled" || echo "Could not hide translations"
+        fi
         
         echo "Current directory: $(pwd)"
-        echo "Build directory contents:"
-        ls -la build/ || echo "ls not available"
+        echo "Build directory created"
         echo "=== Build environment preparation completed ==="
     
     - name: Configure with CMake
@@ -261,6 +265,27 @@ jobs:
         echo "=== Checking executable ==="
         file ${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe || echo "file command not available"
         ls -la ${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe
+        
+    - name: Restore Qt tools after build
+      shell: bash
+      run: |
+        echo "=== Restoring Qt tools ==="
+        
+        # Restore lconvert if it was disabled
+        QT_LCONVERT_PATH="${{ env.Qt6_DIR }}/bin/lconvert.exe"
+        if [ -f "${QT_LCONVERT_PATH}.disabled" ]; then
+          echo "Restoring lconvert"
+          mv "${QT_LCONVERT_PATH}.disabled" "$QT_LCONVERT_PATH" || echo "Could not restore lconvert"
+        fi
+        
+        # Restore translations directory if it was hidden
+        QT_TRANSLATIONS_DIR="${{ env.Qt6_DIR }}/translations"
+        if [ -d "${QT_TRANSLATIONS_DIR}.disabled" ]; then
+          echo "Restoring Qt translations directory"
+          mv "${QT_TRANSLATIONS_DIR}.disabled" "$QT_TRANSLATIONS_DIR" || echo "Could not restore translations"
+        fi
+        
+        echo "=== Qt tools restoration completed ==="
     
     - name: Verify dependencies before deployment
       working-directory: build
