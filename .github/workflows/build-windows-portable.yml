@@ -68,11 +68,33 @@ jobs:
           find . -name "vcpkg.json" -type f || echo "No vcpkg.json files found"
         fi
     
-    - name: Setup vcpkg with vcpkg.json
-      uses: lukka/run-vcpkg@v11
-      with:
-        vcpkgJsonGlob: './vcpkg.json'
-        vcpkgGitCommitId: 'ee0973d8090e4e3e452244bb50d34c25fe907dc2'
+    - name: Setup vcpkg manually
+      shell: bash
+      run: |
+        echo "=== Setting up vcpkg manually ==="
+        
+        # Clone vcpkg to a temporary location
+        git clone https://github.com/microsoft/vcpkg.git vcpkg-temp
+        cd vcpkg-temp
+        
+        # Checkout the specific commit we want
+        git checkout ee0973d8090e4e3e452244bb50d34c25fe907dc2
+        
+        # Bootstrap vcpkg
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          ./bootstrap-vcpkg.bat
+        else
+          ./bootstrap-vcpkg.sh
+        fi
+        
+        # Set up environment variables
+        echo "VCPKG_ROOT=$(pwd)" >> $GITHUB_ENV
+        echo "CMAKE_TOOLCHAIN_FILE=$(pwd)/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_ENV
+        echo "VCPKG_TARGET_TRIPLET=x64-windows" >> $GITHUB_ENV
+        
+        echo "✅ vcpkg setup completed"
+        echo "vcpkg version:"
+        ./vcpkg version
     
     - name: Export GitHub Actions cache environment variables
       uses: actions/github-script@v7
@@ -131,22 +153,28 @@ jobs:
         echo "Triplet: ${{ steps.build_info.outputs.vcpkg_triplet }}"
         echo "MIDI requested: ${{ inputs.enable_midi }}"
         
-        # Set up vcpkg environment
-        echo "CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_ENV
-        echo "VCPKG_TARGET_TRIPLET=${{ steps.build_info.outputs.vcpkg_triplet }}" >> $GITHUB_ENV
+        # vcpkg environment already set up in previous step
+        echo "Using vcpkg from: $VCPKG_ROOT"
+        echo "Triplet: $VCPKG_TARGET_TRIPLET"
         
         if [ "${{ inputs.enable_midi }}" = "true" ]; then
           echo "=== Installing dependencies from vcpkg.json ==="
           
           # Use vcpkg install to process vcpkg.json dependencies
-          if vcpkg install --triplet ${{ steps.build_info.outputs.vcpkg_triplet }}; then
+          # First copy vcpkg.json to current directory if vcpkg looks for it there
+          if [ ! -f "vcpkg.json" ]; then
+            echo "vcpkg.json not found in current directory, this might cause issues"
+          fi
+          
+          cd "$VCPKG_ROOT"
+          if ./vcpkg install --triplet $VCPKG_TARGET_TRIPLET --x-manifest-root="${GITHUB_WORKSPACE}"; then
             echo "✅ Dependencies installed successfully from vcpkg.json"
             echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
           else
             echo "❌ vcpkg.json dependency installation failed"
             echo "Trying manual RtMidi installation as fallback..."
             
-            if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build; then
+            if ./vcpkg install rtmidi:$VCPKG_TARGET_TRIPLET; then
               echo "✅ RtMidi installed successfully via manual installation"
               echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
             else
@@ -156,6 +184,7 @@ jobs:
               echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
             fi
           fi
+          cd -
         else
           echo "MIDI support disabled by user input"
           echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
@@ -163,25 +192,27 @@ jobs:
         
         # Verify installations
         echo "=== Installed packages ==="
-        vcpkg list
+        cd "$VCPKG_ROOT"
+        ./vcpkg list
         
         # Debug RtMidi installation
         echo "=== RtMidi installation verification ==="
-        if vcpkg list | grep -i rtmidi; then
+        if ./vcpkg list | grep -i rtmidi; then
           echo "✅ RtMidi found in vcpkg packages"
           echo "RtMidi installation details:"
-          vcpkg list rtmidi || echo "Could not get RtMidi details"
+          ./vcpkg list rtmidi || echo "Could not get RtMidi details"
           
           # Check if headers are accessible
-          if [ -d "$VCPKG_ROOT/installed/${{ steps.build_info.outputs.vcpkg_triplet }}/include" ]; then
+          if [ -d "$VCPKG_ROOT/installed/$VCPKG_TARGET_TRIPLET/include" ]; then
             echo "Include directory exists:"
-            ls -la "$VCPKG_ROOT/installed/${{ steps.build_info.outputs.vcpkg_triplet }}/include" | grep -i rtmidi || echo "No RtMidi headers found"
+            ls -la "$VCPKG_ROOT/installed/$VCPKG_TARGET_TRIPLET/include" | grep -i rtmidi || echo "No RtMidi headers found"
           fi
         else
           echo "❌ RtMidi not found in vcpkg packages"
           echo "Available packages:"
-          vcpkg list | head -10
+          ./vcpkg list | head -10
         fi
+        cd -
     
     - name: Configure build environment
       shell: bash
