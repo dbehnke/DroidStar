@@ -741,8 +741,8 @@ int CQuantize::lpc_to_lsp(float *a, int order, float *freq, int nb, float delta)
 	float *pt;                	/* ptr used for cheb_poly_eval()
 				   whether P' or Q' 			*/
 	int roots=0;              	/* number of roots found 	        */
-	float Q[order + 1];
-	float P[order + 1];
+	VLA(float, Q, order + 1);
+	VLA(float, P, order + 1);
 
 	flag = 1;
 	m = order/2;            	/* order of P'(z) & Q'(z) polynimials 	*/
@@ -871,7 +871,7 @@ float CQuantize::cheb_poly_eva(float *coef,float x,int order)
 {
 	int i;
 	float *t,*u,*v,sum;
-	float T[(order / 2) + 1];
+	VLA(float, T, (order / 2) + 1);
 
 	/* Initialise pointers */
 

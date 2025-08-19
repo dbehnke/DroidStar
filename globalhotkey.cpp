@@ -22,6 +22,7 @@
 
 #ifdef Q_OS_WIN
 #include <QGuiApplication>
+#include <QWindow>
 #include <windows.h>
 #endif
 
