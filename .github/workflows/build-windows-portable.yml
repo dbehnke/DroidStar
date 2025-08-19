@@ -51,22 +51,10 @@ jobs:
         ref: ${{ inputs.branch }}
         fetch-depth: 0
     
-    - name: Setup vcpkg (latest)
+    - name: Setup vcpkg with vcpkg.json
       uses: lukka/run-vcpkg@v11
-      # Remove fixed commit to use latest vcpkg with updated portfiles
-        
-    - name: Update vcpkg to latest
-      shell: bash
-      run: |
-        echo "=== Updating vcpkg to latest version ==="
-        cd "$VCPKG_ROOT"
-        git fetch --all
-        git checkout master || git checkout main
-        git pull origin master || git pull origin main
-        ./vcpkg update || echo "vcpkg update command failed, continuing"
-        echo "=== vcpkg update completed ==="
-        echo "Current vcpkg version:"
-        ./vcpkg version || echo "vcpkg version command failed"
+      with:
+        vcpkgJsonGlob: '**/vcpkg.json'
     
     - name: Export GitHub Actions cache environment variables
       uses: actions/github-script@v7
@@ -130,42 +118,24 @@ jobs:
         echo "VCPKG_TARGET_TRIPLET=${{ steps.build_info.outputs.vcpkg_triplet }}" >> $GITHUB_ENV
         
         if [ "${{ inputs.enable_midi }}" = "true" ]; then
-          echo "=== Attempting to install RtMidi with multiple strategies ==="
+          echo "=== Installing dependencies from vcpkg.json ==="
           
-          # Strategy 1: Standard installation with latest vcpkg
-          echo "Strategy 1: Standard RtMidi installation"
-          if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build; then
-            echo "✅ RtMidi installed successfully"
+          # Use vcpkg install to process vcpkg.json dependencies
+          if vcpkg install --triplet ${{ steps.build_info.outputs.vcpkg_triplet }}; then
+            echo "✅ Dependencies installed successfully from vcpkg.json"
             echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
           else
-            echo "❌ Strategy 1 failed, trying Strategy 2..."
+            echo "❌ vcpkg.json dependency installation failed"
+            echo "Trying manual RtMidi installation as fallback..."
             
-            # Strategy 2: Force update vcpkg and retry
-            echo "Strategy 2: Update vcpkg and retry RtMidi installation"
-            cd "$VCPKG_ROOT"
-            git pull --force
-            ./vcpkg update || echo "vcpkg update failed"
-            cd -
-            
-            if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build --recurse; then
-              echo "✅ RtMidi installed successfully with updated vcpkg"
+            if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build; then
+              echo "✅ RtMidi installed successfully via manual installation"
               echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
             else
-              echo "❌ Strategy 2 failed, trying Strategy 3..."
-              
-              # Strategy 3: Try forcing a clean install
-              echo "Strategy 3: Clean vcpkg cache and retry"
-              vcpkg remove rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} || echo "No package to remove"
-              
-              if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build --force; then
-                echo "✅ RtMidi installed successfully with force option"
-                echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
-              else
-                echo "❌ All RtMidi installation strategies failed"
-                echo "📝 Building without MIDI support due to vcpkg/MSYS2 dependency issues"
-                echo "This is often due to outdated MSYS2 mirror URLs in vcpkg portfiles"
-                echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
-              fi
+              echo "❌ All RtMidi installation attempts failed"
+              echo "📝 Building without MIDI support due to vcpkg/MSYS2 dependency issues"
+              echo "This is often due to outdated MSYS2 mirror URLs in vcpkg portfiles"
+              echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
             fi
           fi
         else
