@@ -51,18 +51,22 @@ jobs:
         ref: ${{ inputs.branch }}
         fetch-depth: 0
     
-    - name: Setup vcpkg
+    - name: Setup vcpkg (latest)
       uses: lukka/run-vcpkg@v11
-      with:
-        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+      # Remove fixed commit to use latest vcpkg with updated portfiles
         
-    - name: Update vcpkg
+    - name: Update vcpkg to latest
       shell: bash
       run: |
-        echo "=== Updating vcpkg ==="
+        echo "=== Updating vcpkg to latest version ==="
         cd "$VCPKG_ROOT"
-        git pull || echo "Git pull failed, continuing with existing version"
+        git fetch --all
+        git checkout master || git checkout main
+        git pull origin master || git pull origin main
+        ./vcpkg update || echo "vcpkg update command failed, continuing"
         echo "=== vcpkg update completed ==="
+        echo "Current vcpkg version:"
+        ./vcpkg version || echo "vcpkg version command failed"
     
     - name: Export GitHub Actions cache environment variables
       uses: actions/github-script@v7
@@ -126,32 +130,46 @@ jobs:
         echo "VCPKG_TARGET_TRIPLET=${{ steps.build_info.outputs.vcpkg_triplet }}" >> $GITHUB_ENV
         
         if [ "${{ inputs.enable_midi }}" = "true" ]; then
-          # Try to install RtMidi for MIDI support with multiple fallback strategies
-          echo "Attempting to install RtMidi..."
+          echo "=== Attempting to install RtMidi with multiple strategies ==="
           
-          # Strategy 1: Standard installation
-          
+          # Strategy 1: Standard installation with latest vcpkg
+          echo "Strategy 1: Standard RtMidi installation"
           if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build; then
-            echo "RtMidi installed successfully"
+            echo "✅ RtMidi installed successfully"
             echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
           else
-            echo "WARNING: Standard RtMidi installation failed, trying alternative approaches..."
+            echo "❌ Strategy 1 failed, trying Strategy 2..."
             
-            # Strategy 2: Try with different registry or older port
+            # Strategy 2: Force update vcpkg and retry
+            echo "Strategy 2: Update vcpkg and retry RtMidi installation"
+            cd "$VCPKG_ROOT"
+            git pull --force
+            ./vcpkg update || echo "vcpkg update failed"
+            cd -
+            
             if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build --recurse; then
-              echo "RtMidi installed successfully with recurse option"
+              echo "✅ RtMidi installed successfully with updated vcpkg"
               echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
             else
-              echo "WARNING: vcpkg RtMidi installation failed"
-              echo "Trying to use system RtMidi or disabling MIDI..."
+              echo "❌ Strategy 2 failed, trying Strategy 3..."
               
-              # Strategy 3: Try using pre-built binaries or disable MIDI
-              echo "Building without MIDI support due to dependency failures"
-              echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
+              # Strategy 3: Try forcing a clean install
+              echo "Strategy 3: Clean vcpkg cache and retry"
+              vcpkg remove rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} || echo "No package to remove"
+              
+              if vcpkg install rtmidi:${{ steps.build_info.outputs.vcpkg_triplet }} --clean-after-build --force; then
+                echo "✅ RtMidi installed successfully with force option"
+                echo "ENABLE_MIDI=ON" >> $GITHUB_ENV
+              else
+                echo "❌ All RtMidi installation strategies failed"
+                echo "📝 Building without MIDI support due to vcpkg/MSYS2 dependency issues"
+                echo "This is often due to outdated MSYS2 mirror URLs in vcpkg portfiles"
+                echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
+              fi
             fi
           fi
         else
-          echo "MIDI support disabled by user"
+          echo "MIDI support disabled by user input"
           echo "ENABLE_MIDI=OFF" >> $GITHUB_ENV
         fi
         
@@ -221,6 +239,14 @@ jobs:
       run: |
         echo "=== CMake Configuration ==="
         echo "MIDI support: $ENABLE_MIDI"
+        
+        # Ensure build continues regardless of MIDI status
+        if [ "$ENABLE_MIDI" = "OFF" ]; then
+          echo "⚠️ Building without MIDI support - this is acceptable"
+          echo "The build will continue and produce a working executable without MIDI hotkey features"
+        else
+          echo "✅ Building with MIDI support enabled"
+        fi
         
         # Set environment to prevent lconvert issues
         export QT_LOGGING_RULES="*=false"
@@ -295,16 +321,27 @@ jobs:
         
         # Check if executable exists
         if [ -f "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe" ]; then
-          echo "Executable found: ${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe"
+          echo "✅ Executable found: ${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe"
           
           # Get file info without executing
           ls -la "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe"
           file "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe" || echo "file command not available"
           
+          # Check file size to ensure it's not empty
+          FILE_SIZE=$(stat -c%s "${{ env.CMAKE_BUILD_TYPE }}/DroidStar.exe" 2>/dev/null || echo "0")
+          if [ "$FILE_SIZE" -gt 1000000 ]; then  # At least 1MB
+            echo "✅ Executable appears to be valid (size: ${FILE_SIZE} bytes)"
+          else
+            echo "⚠️ Executable seems unusually small (size: ${FILE_SIZE} bytes)"
+          fi
+          
           # Skip version check to avoid GUI initialization issues
           echo "Skipping version check - executable will be tested after deployment"
         else
-          echo "ERROR: Executable not found!"
+          echo "❌ ERROR: Executable not found!"
+          echo "Build directory contents:"
+          ls -la "${{ env.CMAKE_BUILD_TYPE }}/" || echo "Build directory not accessible"
+          echo "This indicates a build failure. Check the build logs above for errors."
           exit 1
         fi
     
