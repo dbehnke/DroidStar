@@ -709,7 +709,8 @@ void M17::process_modem_data(QByteArray d)
 			txframe.append(14, 0x00); //Blank nonce
 			uint16_t frameValue = (static_cast<uint8_t>(netframe[28]) << 8) | static_cast<uint8_t>(netframe[29]);
 			txframe.append((char)(frameValue >> 8));
-			txframe.append((char)(frameValue & 0xff));
+			txframe.append(netframe[28]);
+			txframe.append(netframe[29]);
 			txframe.append((char *)&netframe[30], 16);
 			txframe.append(2, 0x00);
 			m_udp->writeDatagram(txframe, m_address, m_modeinfo.port);
