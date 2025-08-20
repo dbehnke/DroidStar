@@ -119,7 +119,12 @@ execute_process(
 )
 
 # Check for RtMidi support
-option(ENABLE_MIDI "Enable MIDI hotkey support" ON)
+# Disable MIDI by default on Windows due to RtMidi compilation issues
+if(WIN32)
+    option(ENABLE_MIDI "Enable MIDI hotkey support" OFF)
+else()
+    option(ENABLE_MIDI "Enable MIDI hotkey support" ON)
+endif()
 
 if(ENABLE_MIDI)
     set(MIDI_FOUND FALSE)
@@ -143,7 +148,7 @@ if(ENABLE_MIDI)
                 target_include_directories(DroidStar PRIVATE ${VCPKG_INCLUDE_DIR})
                 
                 # Try to find the library
-                find_library(VCPKG_RTMIDI_LIB 
+                find_library(VCPKG_RTMIDI_LIB
                     NAMES rtmidi librtmidi
                     PATHS ${VCPKG_LIB_DIR}
                     NO_DEFAULT_PATH
@@ -187,9 +192,9 @@ if(ENABLE_MIDI)
     # If pkg-config didn't work, try platform-specific detection
     if(NOT MIDI_FOUND)
         # Try to find RtMidi header
-        find_path(RTMIDI_INCLUDE_DIR 
+        find_path(RTMIDI_INCLUDE_DIR
             NAMES RtMidi.h rtmidi/RtMidi.h
-            PATHS 
+            PATHS
                 /usr/include
                 /usr/local/include
                 /opt/homebrew/include
@@ -254,7 +259,7 @@ if(ENABLE_MIDI)
         message(WARNING "RtMidi not found. MIDI support will be disabled.")
         message(STATUS "To enable MIDI support:")
         if(WIN32)
-            message(STATUS "  Windows: Install RtMidi via vcpkg or build from source")
+            message(STATUS "  Windows: Install RtMidi via vcpkg: 'vcpkg install rtmidi'")
         elseif(UNIX AND NOT APPLE)
             message(STATUS "  Linux: sudo apt-get install librtmidi-dev (Ubuntu/Debian)")
             message(STATUS "         sudo dnf install rtmidi-devel (Fedora)")
@@ -263,6 +268,8 @@ if(ENABLE_MIDI)
             message(STATUS "  macOS: brew install rtmidi")
         endif()
     endif()
+else()
+    message(STATUS "MIDI support disabled")
 endif()
 
 target_compile_definitions(DroidStar PRIVATE
