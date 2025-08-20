@@ -136,7 +136,26 @@ if(ENABLE_MIDI)
     if(RtMidi_FOUND)
         message(STATUS "Found RtMidi via find_package (vcpkg): ${RtMidi_VERSION}")
         target_compile_definitions(DroidStar PRIVATE ENABLE_MIDI)
-        target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi)
+        
+        # On Windows, RtMidi typically needs to be statically linked
+        if(WIN32)
+            # Try to link statically first
+            if(TARGET RtMidi::rtmidi_static)
+                target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi_static)
+                message(STATUS "Linking RtMidi statically (rtmidi_static)")
+            elseif(TARGET RtMidi::rtmidi-static)
+                target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi-static)
+                message(STATUS "Linking RtMidi statically (rtmidi-static)")
+            else()
+                target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi)
+                message(STATUS "Linking RtMidi dynamically (fallback)")
+            endif()
+            # Add Windows-specific MIDI libraries
+            target_link_libraries(DroidStar PRIVATE winmm)
+            target_compile_definitions(DroidStar PRIVATE __WINDOWS_MM__)
+        else()
+            target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi)
+        endif()
         set(MIDI_FOUND TRUE)
     else()
         # Check if we have vcpkg installed RtMidi manually
@@ -149,28 +168,42 @@ if(ENABLE_MIDI)
                 target_compile_definitions(DroidStar PRIVATE ENABLE_MIDI)
                 target_include_directories(DroidStar PRIVATE ${VCPKG_INCLUDE_DIR})
                 
-                # Try to find the library
-                find_library(VCPKG_RTMIDI_LIB
-                    NAMES rtmidi librtmidi
-                    PATHS ${VCPKG_LIB_DIR}
-                    NO_DEFAULT_PATH
-                )
+                # Try to find the library - prefer static on Windows
+                if(WIN32)
+                    find_library(VCPKG_RTMIDI_LIB
+                        NAMES rtmidi_static rtmidi librtmidi_static librtmidi
+                        PATHS ${VCPKG_LIB_DIR}
+                        NO_DEFAULT_PATH
+                    )
+                else()
+                    find_library(VCPKG_RTMIDI_LIB
+                        NAMES rtmidi librtmidi
+                        PATHS ${VCPKG_LIB_DIR}
+                        NO_DEFAULT_PATH
+                    )
+                endif()
                 
                 if(VCPKG_RTMIDI_LIB)
                     target_link_libraries(DroidStar PRIVATE ${VCPKG_RTMIDI_LIB})
                     message(STATUS "Linked vcpkg RtMidi library: ${VCPKG_RTMIDI_LIB}")
+                    
+                    # Add Windows-specific MIDI support
+                    if(WIN32)
+                        target_link_libraries(DroidStar PRIVATE winmm)
+                        target_compile_definitions(DroidStar PRIVATE __WINDOWS_MM__)
+                        message(STATUS "Added Windows MM support for RtMidi")
+                    endif()
+                    
+                    set(MIDI_FOUND TRUE)
                 else()
-                    message(STATUS "RtMidi header found but library not found, linking winmm directly")
-                    target_link_libraries(DroidStar PRIVATE winmm)
+                    if(WIN32)
+                        message(STATUS "RtMidi header found but library not found, MIDI will be disabled")
+                        # Don't add winmm if we can't find RtMidi library
+                    else()
+                        message(STATUS "RtMidi header found but library not found")
+                    endif()
                 endif()
                 
-                # Add Windows-specific MIDI support
-                if(WIN32)
-                    target_link_libraries(DroidStar PRIVATE winmm)
-                    target_compile_definitions(DroidStar PRIVATE __WINDOWS_MM__)
-                endif()
-                
-                set(MIDI_FOUND TRUE)
             endif()
         endif()
     endif()
@@ -262,6 +295,8 @@ if(ENABLE_MIDI)
         message(STATUS "To enable MIDI support:")
         if(WIN32)
             message(STATUS "  Windows: Install RtMidi via vcpkg: 'vcpkg install rtmidi'")
+            message(STATUS "           Note: RtMidi on Windows typically requires static linking")
+            message(STATUS "           Make sure to install both static and dynamic variants if available")
         elseif(UNIX AND NOT APPLE)
             message(STATUS "  Linux: sudo apt-get install librtmidi-dev (Ubuntu/Debian)")
             message(STATUS "         sudo dnf install rtmidi-devel (Fedora)")
