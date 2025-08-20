@@ -707,7 +707,7 @@ void M17::process_modem_data(QByteArray d)
 			txframe.append(netframe[12]);
 			txframe.append(netframe[13]);
 			txframe.append(14, 0x00); //Blank nonce
-			uint16_t frameValue = (netframe[28] << 8) | netframe[29];
+			uint16_t frameValue = (static_cast<uint8_t>(netframe[28]) << 8) | static_cast<uint8_t>(netframe[29]);
 			txframe.append((char)(frameValue >> 8));
 			txframe.append((char)(frameValue & 0xff));
 			txframe.append((char *)&netframe[30], 16);
