@@ -42,6 +42,8 @@ MidiHotkey::MidiHotkey(QObject *parent)
 	} catch (RtMidiError &error) {
 		qWarning() << "MidiHotkey: Failed to initialize RtMidi:" << QString::fromStdString(error.getMessage());
 	}
+#elif defined(MIDI_DISABLED)
+	qDebug() << "MidiHotkey: MIDI support explicitly disabled";
 #else
 	qDebug() << "MidiHotkey: MIDI support not compiled in";
 #endif

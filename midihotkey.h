@@ -25,6 +25,16 @@
 
 #ifdef ENABLE_MIDI
 #include "RtMidi.h"
+#elif defined(MIDI_DISABLED)
+// MIDI support is explicitly disabled, no need to include RtMidi.h
+#else
+// MIDI support status unknown, try to include RtMidi.h if available
+#ifdef __has_include
+  #if __has_include("RtMidi.h")
+    #include "RtMidi.h"
+    #define ENABLE_MIDI
+  #endif
+#endif
 #endif
 
 class MidiHotkey : public QObject

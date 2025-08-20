@@ -304,9 +304,13 @@ if(ENABLE_MIDI)
         elseif(APPLE)
             message(STATUS "  macOS: brew install rtmidi")
         endif()
+        # Set MIDI_DISABLED when we can't find RtMidi but MIDI was requested
+        target_compile_definitions(DroidStar PRIVATE MIDI_DISABLED)
     endif()
 else()
     message(STATUS "MIDI support disabled")
+    # Explicitly define that MIDI is disabled so the headers can handle it properly
+    target_compile_definitions(DroidStar PRIVATE MIDI_DISABLED)
 endif()
 
 target_compile_definitions(DroidStar PRIVATE
