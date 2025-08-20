@@ -214,6 +214,7 @@ void MidiHotkey::midiCallback(double deltaTime, std::vector<unsigned char> *mess
 }
 #endif
 
+#ifdef ENABLE_MIDI
 void MidiHotkey::handleMidiMessage(const std::vector<unsigned char> &message)
 {
 	if (!m_midiHotkeyEnabled || message.empty()) {
@@ -304,6 +305,7 @@ int MidiHotkey::getVelocity(const std::vector<unsigned char> &message) const
 	if (message.size() < 3) return 0;
 	return message[2];
 }
+#endif // ENABLE_MIDI
 
 void MidiHotkey::emitToggleStateChanged(bool transmitting)
 {

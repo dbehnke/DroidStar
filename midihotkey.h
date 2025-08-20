@@ -89,16 +89,20 @@ private:
 	QSettings *m_settings;
 	
 	// Methods
-	void handleMidiMessage(const std::vector<unsigned char> &message);
 	void saveSettings();
 	void loadSettings();
 	
-	// MIDI message parsing
+#ifdef ENABLE_MIDI
+	// MIDI-specific methods (only available when MIDI is enabled)
+	void handleMidiMessage(const std::vector<unsigned char> &message);
+	
+	// MIDI message parsing (only available when MIDI is enabled)
 	bool isNoteOn(const std::vector<unsigned char> &message) const;
 	bool isNoteOff(const std::vector<unsigned char> &message) const;
 	int getNoteNumber(const std::vector<unsigned char> &message) const;
 	int getChannel(const std::vector<unsigned char> &message) const;
 	int getVelocity(const std::vector<unsigned char> &message) const;
+#endif
 
 private slots:
 	void emitToggleStateChanged(bool transmitting);
