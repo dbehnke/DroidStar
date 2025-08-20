@@ -96,7 +96,7 @@ MidiHotkeyImpl::MidiHotkeyImpl(MidiHotkey *parent)
 	, m_velocityThreshold(64)
 	, m_toggleMode(false)
 	, m_transmitting(false)
-	, m_settings(new QSettings("DroidStar", "MidiHotkey", parent))
+	, m_settings(new QSettings(parent))
 {
 	try {
 		m_midiIn = new RtMidiIn();
