@@ -465,6 +465,9 @@ jobs:
         windeployqt.exe \
           --${{ env.CMAKE_BUILD_TYPE == 'Debug' && 'debug' || 'release' }} \
           --qmldir .. \
+          --no-translations \
+          --no-system-d3d-compiler \
+          --no-opengl-sw \
           --verbose 2 \
           "${{ steps.build_info.outputs.app_name }}/DroidStar.exe"
         
