@@ -122,6 +122,7 @@ jobs:
         echo "vcpkg_triplet=${{ inputs.architecture }}-windows" >> $GITHUB_OUTPUT
     
     - name: Install Qt
+      id: install_qt
       uses: jurplel/install-qt-action@v4
       with:
         version: ${{ env.QT_VERSION }}
@@ -136,17 +137,51 @@ jobs:
       shell: bash
       run: |
         echo "=== Qt Installation Verification ==="
-        echo "Qt6_DIR: ${{ env.Qt6_DIR }}"
-        echo "PATH includes Qt: $(echo $PATH | grep -o '[^:]*Qt[^:]*' || echo 'Not found in PATH')"
         
-        # Check if Qt CMake files are available
-        if [ -d "${{ env.Qt6_DIR }}/lib/cmake/Qt6" ]; then
-          echo "✅ Qt6 CMake files found"
-          ls "${{ env.Qt6_DIR }}/lib/cmake/Qt6" | head -5
+        # Use Qt installation action's output
+        QT_ROOT="${{ steps.install_qt.outputs.qt-path }}"
+        if [ -z "$QT_ROOT" ]; then
+          # Fallback to standard GitHub Actions Qt path for Qt 6.5.0
+          QT_ROOT="D:/a/DroidStar/Qt/6.5.0/msvc2019_64"
+        fi
+        
+        echo "Qt Root Directory: $QT_ROOT"
+        echo "Qt Version: ${{ env.QT_VERSION }}"
+        
+        # Check PATH for Qt (Windows uses semicolons)
+        echo "PATH includes Qt: $(echo $PATH | grep -o '[^;]*Qt[^;]*' || echo 'Not found in PATH')"
+        
+        # Verify Qt installation
+        if [ -d "$QT_ROOT" ]; then
+          echo "✅ Qt installation directory found"
+          echo "Qt directory contents:"
+          ls "$QT_ROOT" 2>/dev/null | head -10 || echo "Cannot list Qt directory"
+          
+          # Check for CMake files
+          if [ -d "$QT_ROOT/lib/cmake/Qt6" ]; then
+            echo "✅ Qt6 CMake files found"
+            ls "$QT_ROOT/lib/cmake/Qt6" 2>/dev/null | head -5 || echo "Cannot list CMake files"
+          else
+            echo "⚠️ Qt6 CMake files not found at standard location"
+            echo "Searching for Qt6Config.cmake..."
+            find "$QT_ROOT" -name "Qt6Config.cmake" 2>/dev/null | head -3 || echo "No Qt6Config.cmake found"
+          fi
+          
+          # Check for essential Qt tools
+          if [ -f "$QT_ROOT/bin/windeployqt.exe" ]; then
+            echo "✅ windeployqt.exe found"
+          else
+            echo "❌ windeployqt.exe not found"
+            echo "Contents of Qt bin directory:"
+            ls "$QT_ROOT/bin" 2>/dev/null | head -10 || echo "Cannot list bin directory"
+          fi
+          
+          # Set Qt environment for later steps
+          echo "QT_ROOT_DIR=$QT_ROOT" >> $GITHUB_ENV
         else
-          echo "❌ Qt6 CMake files not found"
-          echo "Available directories in Qt6_DIR:"
-          ls "${{ env.Qt6_DIR }}" || echo "Qt6_DIR not accessible"
+          echo "❌ Qt installation directory not found: $QT_ROOT"
+          echo "GitHub Actions Qt should be at: D:/a/DroidStar/Qt/"
+          ls "D:/a/DroidStar/Qt/" 2>/dev/null || echo "Qt directory not found"
         fi
     
     - name: Setup MSVC
@@ -288,13 +323,13 @@ jobs:
       run: |
         echo "=== Build Environment Setup ==="
         echo "Qt version: ${{ env.QT_VERSION }}"
-        echo "Qt location: ${{ env.Qt6_DIR }}"
+        echo "Qt location: ${{ env.QT_ROOT_DIR }}"
         echo "Build type: ${{ env.CMAKE_BUILD_TYPE }}"
         echo "Architecture: ${{ inputs.architecture }}"
         echo "VCPKG triplet: ${{ steps.build_info.outputs.vcpkg_triplet }}"
         
         # Add Qt to PATH
-        echo "${{ env.Qt6_DIR }}/bin" >> $GITHUB_PATH
+        echo "${{ env.QT_ROOT_DIR }}/bin" >> $GITHUB_PATH
         
         # Verify tools
         which qmake6.exe || which qmake.exe || echo "qmake not found"
@@ -322,14 +357,14 @@ jobs:
         echo "QT_SELECT=qt6" >> $GITHUB_ENV
         
         # Prevent lconvert from being found/used by temporarily renaming it
-        QT_LCONVERT_PATH="${{ env.Qt6_DIR }}/bin/lconvert.exe"
+        QT_LCONVERT_PATH="${{ env.QT_ROOT_DIR }}/bin/lconvert.exe"
         if [ -f "$QT_LCONVERT_PATH" ]; then
           echo "Temporarily disabling lconvert to prevent translation issues"
           mv "$QT_LCONVERT_PATH" "${QT_LCONVERT_PATH}.disabled" || echo "Could not disable lconvert"
         fi
         
         # Also check for Qt translation directories and temporarily rename them
-        QT_TRANSLATIONS_DIR="${{ env.Qt6_DIR }}/translations"
+        QT_TRANSLATIONS_DIR="${{ env.QT_ROOT_DIR }}/translations"
         if [ -d "$QT_TRANSLATIONS_DIR" ]; then
           echo "Temporarily hiding Qt translations directory"
           mv "$QT_TRANSLATIONS_DIR" "${QT_TRANSLATIONS_DIR}.disabled" || echo "Could not hide translations"
@@ -364,8 +399,8 @@ jobs:
           -G "Visual Studio 17 2022" \
           -A ${{ inputs.architecture == 'x64' && 'x64' || 'Win32' }} \
           -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
-          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}" \
-          -DQt6_DIR="${{ env.Qt6_DIR }}/lib/cmake/Qt6" \
+          -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}" \
+          -DQt6_DIR="${{ env.QT_ROOT_DIR }}/lib/cmake/Qt6" \
           -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
           -DVCPKG_TARGET_TRIPLET="$VCPKG_TARGET_TRIPLET" \
           -DENABLE_MIDI=$ENABLE_MIDI \
@@ -405,14 +440,14 @@ jobs:
         echo "=== Restoring Qt tools ==="
         
         # Restore lconvert if it was disabled
-        QT_LCONVERT_PATH="${{ env.Qt6_DIR }}/bin/lconvert.exe"
+        QT_LCONVERT_PATH="${{ env.QT_ROOT_DIR }}/bin/lconvert.exe"
         if [ -f "${QT_LCONVERT_PATH}.disabled" ]; then
           echo "Restoring lconvert"
           mv "${QT_LCONVERT_PATH}.disabled" "$QT_LCONVERT_PATH" || echo "Could not restore lconvert"
         fi
         
         # Restore translations directory if it was hidden
-        QT_TRANSLATIONS_DIR="${{ env.Qt6_DIR }}/translations"
+        QT_TRANSLATIONS_DIR="${{ env.QT_ROOT_DIR }}/translations"
         if [ -d "${QT_TRANSLATIONS_DIR}.disabled" ]; then
           echo "Restoring Qt translations directory"
           mv "${QT_TRANSLATIONS_DIR}.disabled" "$QT_TRANSLATIONS_DIR" || echo "Could not restore translations"
