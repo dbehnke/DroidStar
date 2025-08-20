@@ -517,12 +517,48 @@ jobs:
       run: |
         echo "=== Creating NSIS installer ==="
         
-        # Download and install NSIS
-        curl -L -o nsis.exe "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.08/nsis-3.08-setup.exe"
-        ./nsis.exe /S
+        # Try installing NSIS via Chocolatey first (more reliable in CI)
+        echo "Attempting to install NSIS via Chocolatey..."
+        if choco install nsis -y --timeout=300 2>/dev/null; then
+          echo "✅ NSIS installed via Chocolatey"
+          NSIS_PATH="/c/Program Files (x86)/NSIS"
+        else
+          echo "Chocolatey installation failed, trying manual installation..."
+          
+          # Download NSIS installer
+          echo "Downloading NSIS..."
+          curl -L -o nsis.exe "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.08/nsis-3.08-setup.exe"
+          
+          # Install NSIS with timeout and proper error handling
+          echo "Installing NSIS silently..."
+          timeout 300s ./nsis.exe /S || {
+            echo "❌ NSIS installation failed or timed out"
+            exit 1
+          }
+          
+          # Wait for installation to complete and verify
+          echo "Waiting for NSIS installation to complete..."
+          sleep 10
+          
+          NSIS_PATH="/c/Program Files (x86)/NSIS"
+        fi
+        
+        # Verify NSIS was installed
+        if [ ! -f "$NSIS_PATH/makensis.exe" ]; then
+          echo "❌ NSIS makensis.exe not found after installation"
+          echo "Available files in NSIS directory:"
+          ls -la "$NSIS_PATH/" 2>/dev/null || echo "NSIS directory not found"
+          
+          # Try alternative paths
+          echo "Searching for NSIS in alternative locations..."
+          find "/c/Program Files" -name "makensis.exe" 2>/dev/null || echo "makensis.exe not found"
+          exit 1
+        fi
+        
+        echo "✅ NSIS installed successfully at $NSIS_PATH"
         
         # Add NSIS to PATH
-        echo "/c/Program Files (x86)/NSIS" >> $GITHUB_PATH
+        echo "$NSIS_PATH" >> $GITHUB_PATH
         
         # Create NSIS script
         cat > installer.nsi << 'EOF'
@@ -582,8 +618,23 @@ jobs:
         SectionEnd
         EOF
         
-        # Compile installer
-        "/c/Program Files (x86)/NSIS/makensis.exe" installer.nsi
+        # Verify NSIS script was created
+        if [ ! -f "installer.nsi" ]; then
+          echo "❌ NSIS script creation failed"
+          exit 1
+        fi
+        
+        echo "✅ NSIS script created"
+        echo "Script size: $(wc -l installer.nsi)"
+        
+        # Compile installer with timeout
+        echo "Compiling NSIS installer..."
+        timeout 300s "$NSIS_PATH/makensis.exe" installer.nsi || {
+          echo "❌ NSIS compilation failed or timed out"
+          echo "NSIS compilation output:"
+          cat *.log 2>/dev/null || echo "No log files found"
+          exit 1
+        }
         
         echo "=== NSIS installer created ==="
         ls -la *installer.exe
