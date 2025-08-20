@@ -137,15 +137,53 @@ if(ENABLE_MIDI)
         message(STATUS "Found RtMidi via find_package (vcpkg): ${RtMidi_VERSION}")
         target_compile_definitions(DroidStar PRIVATE ENABLE_MIDI)
         
+        # Get RtMidi include directories and add them explicitly
+        if(TARGET RtMidi::rtmidi)
+            get_target_property(RTMIDI_INCLUDE_DIRS RtMidi::rtmidi INTERFACE_INCLUDE_DIRECTORIES)
+            if(RTMIDI_INCLUDE_DIRS)
+                target_include_directories(DroidStar PRIVATE ${RTMIDI_INCLUDE_DIRS})
+                message(STATUS "Added RtMidi include directories: ${RTMIDI_INCLUDE_DIRS}")
+            else()
+                # Fallback: try to find RtMidi.h manually
+                find_path(RTMIDI_FALLBACK_INCLUDE_DIR
+                    NAMES RtMidi.h
+                    PATHS
+                        ${CMAKE_PREFIX_PATH}/include
+                        $ENV{VCPKG_ROOT}/installed/$ENV{VCPKG_TARGET_TRIPLET}/include
+                        /usr/include
+                        /usr/local/include
+                        /opt/homebrew/include
+                )
+                if(RTMIDI_FALLBACK_INCLUDE_DIR)
+                    target_include_directories(DroidStar PRIVATE ${RTMIDI_FALLBACK_INCLUDE_DIR})
+                    message(STATUS "Added RtMidi fallback include directory: ${RTMIDI_FALLBACK_INCLUDE_DIR}")
+                else()
+                    message(WARNING "Could not determine RtMidi include directory")
+                endif()
+            endif()
+        endif()
+        
         # On Windows, RtMidi typically needs to be statically linked
         if(WIN32)
             # Try to link statically first
             if(TARGET RtMidi::rtmidi_static)
                 target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi_static)
                 message(STATUS "Linking RtMidi statically (rtmidi_static)")
+                # Get include dirs from static target too
+                get_target_property(RTMIDI_STATIC_INCLUDE_DIRS RtMidi::rtmidi_static INTERFACE_INCLUDE_DIRECTORIES)
+                if(RTMIDI_STATIC_INCLUDE_DIRS)
+                    target_include_directories(DroidStar PRIVATE ${RTMIDI_STATIC_INCLUDE_DIRS})
+                    message(STATUS "Added RtMidi static include directories: ${RTMIDI_STATIC_INCLUDE_DIRS}")
+                endif()
             elseif(TARGET RtMidi::rtmidi-static)
                 target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi-static)
                 message(STATUS "Linking RtMidi statically (rtmidi-static)")
+                # Get include dirs from static target too
+                get_target_property(RTMIDI_STATIC_INCLUDE_DIRS RtMidi::rtmidi-static INTERFACE_INCLUDE_DIRECTORIES)
+                if(RTMIDI_STATIC_INCLUDE_DIRS)
+                    target_include_directories(DroidStar PRIVATE ${RTMIDI_STATIC_INCLUDE_DIRS})
+                    message(STATUS "Added RtMidi static include directories: ${RTMIDI_STATIC_INCLUDE_DIRS}")
+                endif()
             else()
                 target_link_libraries(DroidStar PRIVATE RtMidi::rtmidi)
                 message(STATUS "Linking RtMidi dynamically (fallback)")
