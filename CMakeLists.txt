@@ -531,6 +531,17 @@ if(FALSE) # set TRUE for md380_vocoder
     )
 endif()
 
+# Windows-specific configuration to avoid deployment script issues
+if(WIN32)
+    # Disable Qt translation processing that causes Windows build issues
+    set_target_properties(DroidStar PROPERTIES
+        QT_ANDROID_DEPLOYMENT_DEPENDENCIES ""
+        QT_QML_ROOT_PATH ""
+    )
+    # Ensure deployment script is completely disabled
+    set(QT_DEPLOY_SUPPORT OFF)
+endif()
+
 install(TARGETS DroidStar
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -539,7 +550,7 @@ install(TARGETS DroidStar
 
 # Deployment script generation (if available in Qt version)
 # Disable on Windows due to translation processing issues
-if(ENABLE_DEPLOYMENT_SCRIPT AND COMMAND qt_generate_deploy_app_script)
+if(ENABLE_DEPLOYMENT_SCRIPT AND COMMAND qt_generate_deploy_app_script AND NOT WIN32)
     qt_generate_deploy_app_script(
         TARGET DroidStar
         FILENAME_VARIABLE deploy_script
@@ -548,12 +559,13 @@ if(ENABLE_DEPLOYMENT_SCRIPT AND COMMAND qt_generate_deploy_app_script)
     install(SCRIPT ${deploy_script})
     message(STATUS "Qt deployment script generated")
 else()
-    if(WIN32 AND NOT ENABLE_DEPLOYMENT_SCRIPT)
-        message(STATUS "Qt deployment script disabled on Windows to avoid translation issues")
-        message(STATUS "Use -DENABLE_DEPLOYMENT_SCRIPT=ON to force enable (may cause build failures)")
+    if(WIN32)
+        message(STATUS "Qt deployment script explicitly disabled on Windows to avoid translation processing issues")
+    elseif(NOT ENABLE_DEPLOYMENT_SCRIPT)
+        message(STATUS "Qt deployment script disabled by user option")
     elseif(NOT COMMAND qt_generate_deploy_app_script)
         message(STATUS "qt_generate_deploy_app_script not available, skipping deployment script generation")
     else()
-        message(STATUS "Qt deployment script disabled by user option")
+        message(STATUS "Qt deployment script disabled for unknown reason")
     endif()
 endif()
