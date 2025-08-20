@@ -560,7 +560,7 @@ jobs:
         # Add NSIS to PATH
         echo "$NSIS_PATH" >> $GITHUB_PATH
         
-        # Create NSIS script
+        # Create NSIS script without icons to avoid path issues
         cat > installer.nsi << 'EOF'
         !define APP_NAME "DroidStar"
         !define APP_VERSION "${{ steps.build_info.outputs.git_sha }}"
@@ -574,9 +574,6 @@ jobs:
         RequestExecutionLevel admin
         
         !include "MUI2.nsh"
-        
-        !define MUI_ICON "${{ steps.build_info.outputs.app_name }}\DroidStar.exe"
-        !define MUI_UNICON "${{ steps.build_info.outputs.app_name }}\DroidStar.exe"
         
         !insertmacro MUI_PAGE_WELCOME
         !insertmacro MUI_PAGE_LICENSE "..\..\README.md"
