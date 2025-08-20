@@ -122,8 +122,10 @@ execute_process(
 # Disable MIDI by default on Windows due to RtMidi compilation issues
 if(WIN32)
     option(ENABLE_MIDI "Enable MIDI hotkey support" OFF)
+    option(ENABLE_DEPLOYMENT_SCRIPT "Enable Qt deployment script generation" OFF)
 else()
     option(ENABLE_MIDI "Enable MIDI hotkey support" ON)
+    option(ENABLE_DEPLOYMENT_SCRIPT "Enable Qt deployment script generation" ON)
 endif()
 
 if(ENABLE_MIDI)
@@ -445,13 +447,22 @@ install(TARGETS DroidStar
 )
 
 # Deployment script generation (if available in Qt version)
-if(COMMAND qt_generate_deploy_app_script)
+# Disable on Windows due to translation processing issues
+if(ENABLE_DEPLOYMENT_SCRIPT AND COMMAND qt_generate_deploy_app_script)
     qt_generate_deploy_app_script(
         TARGET DroidStar
         FILENAME_VARIABLE deploy_script
         NO_UNSUPPORTED_PLATFORM_ERROR
     )
     install(SCRIPT ${deploy_script})
+    message(STATUS "Qt deployment script generated")
 else()
-    message(STATUS "qt_generate_deploy_app_script not available, skipping deployment script generation")
+    if(WIN32 AND NOT ENABLE_DEPLOYMENT_SCRIPT)
+        message(STATUS "Qt deployment script disabled on Windows to avoid translation issues")
+        message(STATUS "Use -DENABLE_DEPLOYMENT_SCRIPT=ON to force enable (may cause build failures)")
+    elseif(NOT COMMAND qt_generate_deploy_app_script)
+        message(STATUS "qt_generate_deploy_app_script not available, skipping deployment script generation")
+    else()
+        message(STATUS "Qt deployment script disabled by user option")
+    endif()
 endif()
