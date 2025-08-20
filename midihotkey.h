@@ -23,12 +23,14 @@
 #include <QStringList>
 #include <QTimer>
 
-#ifdef ENABLE_MIDI
-#include "RtMidi.h"
+// Only include RtMidi.h if MIDI support is enabled
+#if defined(ENABLE_MIDI)
+  // Try to include RtMidi.h - if it fails, MIDI will be disabled at runtime
+  #include "RtMidi.h"
+#elif !defined(MIDI_DISABLED)
+  // If neither ENABLE_MIDI nor MIDI_DISABLED is defined, assume MIDI is disabled
+  #define MIDI_DISABLED
 #endif
-
-// Note: When MIDI_DISABLED is defined or ENABLE_MIDI is not defined,
-// we skip including RtMidi.h entirely to avoid compilation errors
 
 class MidiHotkey : public QObject
 {
@@ -69,9 +71,11 @@ signals:
 	void midiDeviceError(const QString &error);
 
 private:
-#ifdef ENABLE_MIDI
+#if defined(ENABLE_MIDI) && !defined(MIDI_DISABLED)
 	RtMidiIn *m_midiIn;
 	static void midiCallback(double deltaTime, std::vector<unsigned char> *message, void *userData);
+#else
+	void *m_midiIn; // Placeholder when MIDI is disabled
 #endif
 	
 	bool m_midiDeviceOpen;
@@ -95,7 +99,7 @@ private:
 	void saveSettings();
 	void loadSettings();
 	
-#ifdef ENABLE_MIDI
+#if defined(ENABLE_MIDI) && !defined(MIDI_DISABLED)
 	// MIDI-specific methods (only available when MIDI is enabled)
 	void handleMidiMessage(const std::vector<unsigned char> &message);
 	

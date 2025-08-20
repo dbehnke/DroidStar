@@ -35,7 +35,7 @@ MidiHotkey::MidiHotkey(QObject *parent)
 {
 	loadSettings();
 
-#ifdef ENABLE_MIDI
+#if defined(ENABLE_MIDI) && !defined(MIDI_DISABLED)
 	try {
 		m_midiIn = new RtMidiIn();
 		qDebug() << "MidiHotkey: RtMidi initialized successfully";
@@ -43,8 +43,10 @@ MidiHotkey::MidiHotkey(QObject *parent)
 		qWarning() << "MidiHotkey: Failed to initialize RtMidi:" << QString::fromStdString(error.getMessage());
 	}
 #elif defined(MIDI_DISABLED)
+	m_midiIn = nullptr;
 	qDebug() << "MidiHotkey: MIDI support explicitly disabled";
 #else
+	m_midiIn = nullptr;
 	qDebug() << "MidiHotkey: MIDI support not compiled in";
 #endif
 }
@@ -52,7 +54,7 @@ MidiHotkey::MidiHotkey(QObject *parent)
 MidiHotkey::~MidiHotkey()
 {
 	closeMidiDevice();
-#ifdef ENABLE_MIDI
+#if defined(ENABLE_MIDI) && !defined(MIDI_DISABLED)
 	delete m_midiIn;
 #endif
 }
@@ -201,7 +203,7 @@ void MidiHotkey::clearMidiHotkey()
 	qDebug() << "MidiHotkey: Cleared MIDI hotkey";
 }
 
-#ifdef ENABLE_MIDI
+#if defined(ENABLE_MIDI) && !defined(MIDI_DISABLED)
 void MidiHotkey::midiCallback(double deltaTime, std::vector<unsigned char> *message, void *userData)
 {
 	Q_UNUSED(deltaTime)
@@ -216,7 +218,7 @@ void MidiHotkey::midiCallback(double deltaTime, std::vector<unsigned char> *mess
 }
 #endif
 
-#ifdef ENABLE_MIDI
+#if defined(ENABLE_MIDI) && !defined(MIDI_DISABLED)
 void MidiHotkey::handleMidiMessage(const std::vector<unsigned char> &message)
 {
 	if (!m_midiHotkeyEnabled || message.empty()) {
