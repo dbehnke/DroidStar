@@ -633,7 +633,10 @@ jobs:
         }
         
         echo "=== NSIS installer created ==="
-        ls -la *installer.exe
+        ls -la "${{ steps.build_info.outputs.app_name }}_installer.exe" || {
+          echo "Searching for installer files..."
+          find . -name "*installer.exe" -o -name "*.exe" | grep -i install || echo "No installer files found"
+        }
     
     - name: Create build summary
       working-directory: build
