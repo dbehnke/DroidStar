@@ -127,6 +127,9 @@ if(WIN32)
     set(QT_NO_MAKE_INSTALL ON)
     set(QT_NO_INSTALL ON)
     set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON)
+    # Disable install entirely on Windows to avoid Qt translation processing
+    set(CMAKE_SKIP_INSTALL_RULES ON)
+    message(STATUS "Windows: Install rules disabled to prevent Qt translation processing issues")
 else()
     option(ENABLE_MIDI "Enable MIDI hotkey support" ON)
     option(ENABLE_DEPLOYMENT_SCRIPT "Enable Qt deployment script generation" ON)
@@ -543,14 +546,19 @@ if(WIN32)
         QT_QML_ROOT_PATH ""
         QT_DEPLOY_TRANSLATIONS_DIR ""
         QT_NO_TRANSLATION_DEPLOYMENT TRUE
+        QT_TRANSLATIONS_DIR ""
+        QT_LINGUIST_DIRECTORY ""
     )
     # Ensure deployment script is completely disabled
     set(QT_DEPLOY_SUPPORT OFF)
     # Disable Qt automatic translation detection
     set(QT_NO_CREATE_DEPLOYMENT TRUE)
     set(CMAKE_INSTALL_DO_STRIP OFF)
-    # Set environment variable to prevent Qt from processing translations
+    # Set multiple environment variables to prevent Qt from processing translations
     set(ENV{QT_NO_TRANSLATION_DEPLOYMENT} "1")
+    set(ENV{QT_SKIP_TRANSLATION_DEPLOYMENT} "1")
+    set(ENV{QT_NO_LCONVERT} "1")
+    set(ENV{QT_TRANSLATIONS_DIR} "")
     # Completely disable the Qt deployment script command on Windows
     if(COMMAND qt_generate_deploy_app_script)
         # Undefine the command to prevent any accidental calls
@@ -559,25 +567,28 @@ if(WIN32)
             message(STATUS "qt_generate_deploy_app_script disabled on Windows to prevent translation errors")
         endfunction()
     endif()
+    # Override lconvert command if it exists
+    if(COMMAND lconvert)
+        function(lconvert)
+            message(STATUS "lconvert command disabled on Windows to prevent translation processing errors")
+        endfunction()
+    endif()
     message(STATUS "Windows build: All Qt deployment features disabled to prevent translation processing errors")
 endif()
 
 # Install configuration - different handling for Windows vs other platforms
+# On Windows, skip install entirely to avoid Qt translation processing issues
 if(WIN32)
-    # Windows-specific install without Qt deployment to avoid translation issues
-    install(TARGETS DroidStar 
-        RUNTIME DESTINATION .
-        COMPONENT Runtime
-    )
-    message(STATUS "Windows install: Using simple runtime-only installation")
-else()
-    # Standard install for non-Windows platforms
+    message(STATUS "Windows build: Install phase skipped entirely to prevent Qt deployment issues")
+    message(STATUS "Executable will be available in build directory without install")
+elseif(NOT WIN32)
+    # Standard install for non-Windows platforms only
     install(TARGETS DroidStar
         BUNDLE DESTINATION .
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
-    message(STATUS "Standard install: Using full Qt deployment")
+    message(STATUS "Non-Windows install: Using standard Qt deployment")
 endif()
 
 # Deployment script generation (if available in Qt version)
