@@ -123,6 +123,10 @@ execute_process(
 if(WIN32)
     option(ENABLE_MIDI "Enable MIDI hotkey support" OFF)
     option(ENABLE_DEPLOYMENT_SCRIPT "Enable Qt deployment script generation" OFF)
+    # Additional Windows-specific Qt flags to prevent deployment issues
+    set(QT_NO_MAKE_INSTALL ON)
+    set(QT_NO_INSTALL ON)
+    set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON)
 else()
     option(ENABLE_MIDI "Enable MIDI hotkey support" ON)
     option(ENABLE_DEPLOYMENT_SCRIPT "Enable Qt deployment script generation" ON)
@@ -537,16 +541,44 @@ if(WIN32)
     set_target_properties(DroidStar PROPERTIES
         QT_ANDROID_DEPLOYMENT_DEPENDENCIES ""
         QT_QML_ROOT_PATH ""
+        QT_DEPLOY_TRANSLATIONS_DIR ""
+        QT_NO_TRANSLATION_DEPLOYMENT TRUE
     )
     # Ensure deployment script is completely disabled
     set(QT_DEPLOY_SUPPORT OFF)
+    # Disable Qt automatic translation detection
+    set(QT_NO_CREATE_DEPLOYMENT TRUE)
+    set(CMAKE_INSTALL_DO_STRIP OFF)
+    # Set environment variable to prevent Qt from processing translations
+    set(ENV{QT_NO_TRANSLATION_DEPLOYMENT} "1")
+    # Completely disable the Qt deployment script command on Windows
+    if(COMMAND qt_generate_deploy_app_script)
+        # Undefine the command to prevent any accidental calls
+        unset(qt_generate_deploy_app_script)
+        function(qt_generate_deploy_app_script)
+            message(STATUS "qt_generate_deploy_app_script disabled on Windows to prevent translation errors")
+        endfunction()
+    endif()
+    message(STATUS "Windows build: All Qt deployment features disabled to prevent translation processing errors")
 endif()
 
-install(TARGETS DroidStar
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+# Install configuration - different handling for Windows vs other platforms
+if(WIN32)
+    # Windows-specific install without Qt deployment to avoid translation issues
+    install(TARGETS DroidStar 
+        RUNTIME DESTINATION .
+        COMPONENT Runtime
+    )
+    message(STATUS "Windows install: Using simple runtime-only installation")
+else()
+    # Standard install for non-Windows platforms
+    install(TARGETS DroidStar
+        BUNDLE DESTINATION .
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    message(STATUS "Standard install: Using full Qt deployment")
+endif()
 
 # Deployment script generation (if available in Qt version)
 # Disable on Windows due to translation processing issues
