@@ -115,7 +115,10 @@ jobs:
         echo "git_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         echo "git_branch=${{ inputs.branch }}" >> $GITHUB_OUTPUT
         echo "build_date=$(date '+%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
-        echo "app_name=DroidStar_${{ inputs.branch }}_$(git rev-parse --short HEAD)_${{ inputs.architecture }}" >> $GITHUB_OUTPUT
+        
+        # Sanitize branch name for artifact names (replace invalid characters with underscores)
+        SANITIZED_BRANCH=$(echo "${{ inputs.branch }}" | sed 's/["/:<>|*?\\]/_/g')
+        echo "app_name=DroidStar_${SANITIZED_BRANCH}_$(git rev-parse --short HEAD)_${{ inputs.architecture }}" >> $GITHUB_OUTPUT
         echo "vcpkg_triplet=${{ inputs.architecture }}-windows" >> $GITHUB_OUTPUT
     
     - name: Install Qt
